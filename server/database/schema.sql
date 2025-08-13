@@ -1,0 +1,216 @@
+-- CRM Database Schema
+-- Crear base de datos
+CREATE DATABASE crm_v0;
+
+-- Usar la base de datos
+\c crm_v0;
+
+-- Tabla de roles
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    permissions JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de usuarios
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    role_id INTEGER REFERENCES roles(id),
+    is_active BOOLEAN DEFAULT true,
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de empresas
+CREATE TABLE companies (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    nit VARCHAR(20) UNIQUE,  -- Identificación única Empresas
+    industry VARCHAR(100),
+    website VARCHAR(255),
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    address TEXT,
+    city VARCHAR(100),
+    country VARCHAR(100),
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- Tabla de contactos
+CREATE TABLE contacts (
+    id SERIAL PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    mobile VARCHAR(20),
+    position VARCHAR(100),
+    company_id INTEGER REFERENCES companies(id),
+    assigned_to INTEGER REFERENCES users(id),
+    source VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'active',
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de fases de negocio
+CREATE TABLE deal_phases (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    order_index INTEGER NOT NULL,
+    probability DECIMAL(5,2) DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de negocios
+CREATE TABLE deals (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    value DECIMAL(15,2),
+    currency VARCHAR(3) DEFAULT 'USD',
+    contact_id INTEGER REFERENCES contacts(id),
+    company_id INTEGER REFERENCES companies(id),
+    assigned_to INTEGER REFERENCES users(id),
+    phase_id INTEGER REFERENCES deal_phases(id),
+    source VARCHAR(50),
+    expected_close_date DATE,
+    actual_close_date DATE,
+    probability DECIMAL(5,2),
+    status VARCHAR(50) DEFAULT 'open',
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de tipos de actividad
+CREATE TABLE activity_types (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    icon VARCHAR(50),
+    color VARCHAR(7),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de actividades
+CREATE TABLE activities (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    activity_type_id INTEGER REFERENCES activity_types(id),
+    start_date TIMESTAMP NOT NULL,
+    end_date TIMESTAMP,
+    duration INTEGER, -- en minutos
+    status VARCHAR(50) DEFAULT 'planned', -- planned, completed, cancelled
+    contact_id INTEGER REFERENCES contacts(id),
+    company_id INTEGER REFERENCES companies(id),
+    deal_id INTEGER REFERENCES deals(id),
+    assigned_to INTEGER REFERENCES users(id),
+    location VARCHAR(255),
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de logs del sistema
+CREATE TABLE system_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50), -- users, contacts, deals, activities, etc.
+    entity_id INTEGER,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de transferencias de clientes
+CREATE TABLE client_transfers (
+    id SERIAL PRIMARY KEY,
+    contact_id INTEGER REFERENCES contacts(id),
+    from_user_id INTEGER REFERENCES users(id),
+    to_user_id INTEGER REFERENCES users(id),
+    reason TEXT,
+    transfer_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    approved_by INTEGER REFERENCES users(id),
+    status VARCHAR(50) DEFAULT 'pending', -- pending, approved, rejected
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insertar roles por defecto
+INSERT INTO roles (name, description, permissions) VALUES
+('Administrador del CRM', 'Acceso completo al sistema', '{"all": true}'),
+('Gerente de Ventas', 'Supervisa equipos de ventas', '{"view_all_deals": true, "manage_team": true, "view_reports": true}'),
+('Comercial', 'Gestiona clientes y ventas', '{"manage_own_deals": true, "view_own_reports": true}');
+
+-- Insertar fases de negocio por defecto
+INSERT INTO deal_phases (name, order_index, probability) VALUES
+('Prospecto', 1, 10),
+('Primer Contacto', 2, 25),
+('Propuesta Comercial', 3, 50),
+('Negociación', 4, 75),
+('Cerrada-Ganada', 5, 100),
+('Cerrada-Perdida', 6, 0);
+
+-- Insertar tipos de actividad por defecto
+INSERT INTO activity_types (name, icon, color) VALUES
+('Reunión', 'calendar', '#3B82F6'),
+('Llamada', 'phone', '#10B981'),
+('Email', 'mail', '#F59E0B'),
+('Seguimiento', 'clock', '#8B5CF6'),
+('Soporte Técnico', 'tool', '#EF4444'),
+('Aniversario Cliente', 'gift', '#EC4899'),
+('Facturación', 'dollar-sign', '#059669'),
+('Hito Proyecto', 'flag', '#DC2626');
+
+-- Crear índices para mejorar rendimiento
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role_id);
+CREATE INDEX idx_contacts_company ON contacts(company_id);
+CREATE INDEX idx_contacts_assigned ON contacts(assigned_to);
+CREATE INDEX idx_deals_contact ON deals(contact_id);
+CREATE INDEX idx_deals_assigned ON deals(assigned_to);
+CREATE INDEX idx_deals_phase ON deals(phase_id);
+CREATE INDEX idx_activities_assigned ON activities(assigned_to);
+CREATE INDEX idx_activities_date ON activities(start_date);
+CREATE INDEX idx_system_logs_user ON system_logs(user_id);
+CREATE INDEX idx_system_logs_date ON system_logs(created_at);
+
+-- Crear función para actualizar timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Crear triggers para actualizar updated_at
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_contacts_updated_at BEFORE UPDATE ON contacts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_deals_updated_at BEFORE UPDATE ON deals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_activities_updated_at BEFORE UPDATE ON activities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

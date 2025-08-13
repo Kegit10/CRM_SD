@@ -279,3 +279,4 @@ router.delete('/:id', authenticateToken, requireRole(['Administrador del CRM', '
 });
 
 module.exports = router;
+

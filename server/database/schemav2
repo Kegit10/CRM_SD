@@ -3,10 +3,10 @@
 -- ====================================
 
 -- Crear base de datos
-CREATE DATABASE crm_v0;
+CREATE DATABASE crm_v1;
 
 -- Usar la base de datos
-\c crm_v0;
+\c crm_v1;
 
 -- ====================================
 -- 1. Tabla de roles

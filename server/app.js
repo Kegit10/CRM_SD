@@ -91,6 +91,13 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/auth/login', authLimiter);
+// Servir archivos estáticos del frontend (React build)
+app.use(express.static(path.join(__dirname, '../build')));
+
+// Para rutas que no son API, devolver index.html
+app.get(/^\/(?!api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../build/index.html'));
+});
 
 // Middleware de compresión
 app.use(compression());

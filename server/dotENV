@@ -12,7 +12,7 @@ DB_HOST=db.clgecdnfvzpsqletpekn.supabase.co
 DB_PORT=5432
 DB_NAME=postgres
 DB_USER=postgres
-DB_PASSWORD=tu-contraseña-aquí
+DB_PASSWORD=zhVQzbqxUiJl482PWyQu
 
 # JWT Configuration
 JWT_SECRET=aE7v9X2kN3sQ1zU8pLdC6vYwR5tGjHmF

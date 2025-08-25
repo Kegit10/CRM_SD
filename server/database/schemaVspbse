@@ -1,0 +1,449 @@
+-- ====================================
+-- CRM Database Schema (versión para Supabase)
+-- ====================================
+
+--
+-- NOTA: Supabase gestiona el esquema y la tabla de autenticación.
+-- Se usa UUID para la tabla de usuarios de la aplicación
+-- y se referencia la tabla auth.users para las relaciones.
+--
+
+-- ====================================
+-- 1. Tabla de roles
+-- ====================================
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    permissions JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 2. Tabla de usuarios de la aplicación
+-- ====================================
+-- Esta tabla está vinculada a la tabla de autenticación de Supabase (auth.users)
+-- para una gestión de usuarios más limpia y segura.
+CREATE TABLE app_users (
+    id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    role_id INTEGER REFERENCES roles(id),
+    is_active BOOLEAN DEFAULT true,
+    last_login TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 3. Tabla de empresas
+-- ====================================
+CREATE TABLE companies (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    nit VARCHAR(20) UNIQUE,
+    industry VARCHAR(100),
+    website VARCHAR(255),
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    address TEXT,
+    city VARCHAR(100),
+    country VARCHAR(100),
+    notes TEXT,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 4. Tabla de contactos
+-- ====================================
+CREATE TABLE contacts (
+    id SERIAL PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    mobile VARCHAR(20),
+    position VARCHAR(100),
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    source VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'active',
+    notes TEXT,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 5. Tabla de fases de negocio
+-- ====================================
+CREATE TABLE deal_phases (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    order_index INTEGER UNIQUE NOT NULL,
+    probability DECIMAL(5,2) DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 6. Tabla de negocios
+-- ====================================
+CREATE TABLE deals (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    value DECIMAL(15,2),
+    currency VARCHAR(3) DEFAULT 'USD',
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    phase_id INTEGER REFERENCES deal_phases(id) ON DELETE SET NULL,
+    source VARCHAR(50),
+    expected_close_date DATE,
+    actual_close_date DATE,
+    probability DECIMAL(5,2),
+    status VARCHAR(50) DEFAULT 'open',
+    notes TEXT,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 7. Tablas jerárquicas de actividades
+-- ====================================
+CREATE TABLE activity_categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE tasks (
+    id SERIAL PRIMARY KEY,
+    category_id INTEGER NOT NULL REFERENCES activity_categories(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE sub_tasks (
+    id SERIAL PRIMARY KEY,
+    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 8. Tabla de actividades
+-- ====================================
+CREATE TABLE activities (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_date TIMESTAMP WITH TIME ZONE,
+    duration INTEGER,
+    status VARCHAR(50) DEFAULT 'planned', -- planned, completed, cancelled
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    deal_id INTEGER REFERENCES deals(id) ON DELETE SET NULL,
+    assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    location VARCHAR(255),
+    notes TEXT,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    sub_task_id INTEGER REFERENCES sub_tasks(id) ON DELETE SET NULL
+);
+
+---
+---
+
+-- ====================================
+-- 9. Tabla de logs del sistema
+-- ====================================
+CREATE TABLE system_logs (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id INTEGER,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 10. Tabla de transferencias de clientes
+-- ====================================
+CREATE TABLE client_transfers (
+    id SERIAL PRIMARY KEY,
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    from_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    to_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    reason TEXT,
+    transfer_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    approved_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    status VARCHAR(50) DEFAULT 'pending', -- pending, approved, rejected
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+---
+---
+
+-- ====================================
+-- 11. Índices
+-- ====================================
+CREATE INDEX idx_app_users_email ON app_users(email);
+CREATE INDEX idx_app_users_role ON app_users(role_id);
+CREATE INDEX idx_contacts_company ON contacts(company_id);
+CREATE INDEX idx_contacts_assigned ON contacts(assigned_to);
+CREATE INDEX idx_deals_contact ON deals(contact_id);
+CREATE INDEX idx_deals_assigned ON deals(assigned_to);
+CREATE INDEX idx_deals_phase ON deals(phase_id);
+CREATE INDEX idx_activities_assigned ON activities(assigned_to);
+CREATE INDEX idx_activities_date ON activities(start_date);
+CREATE INDEX idx_activities_sub_task ON activities(sub_task_id);
+CREATE INDEX idx_system_logs_user ON system_logs(user_id);
+CREATE INDEX idx_system_logs_date ON system_logs(created_at);
+
+---
+---
+
+-- ====================================
+-- 12. Función y triggers para updated_at
+-- ====================================
+-- Se usa `NOW()` en lugar de `CURRENT_TIMESTAMP` para compatibilidad y consistencia
+-- con el formato de Supabase.
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_app_users_updated_at BEFORE UPDATE ON app_users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_contacts_updated_at BEFORE UPDATE ON contacts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_deals_updated_at BEFORE UPDATE ON deals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_activities_updated_at BEFORE UPDATE ON activities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+---
+---
+
+-- ====================================
+-- 13. Datos por defecto
+-- ====================================
+INSERT INTO roles (name, description, permissions) VALUES
+('Administrador del CRM', 'Acceso completo al sistema', '{"all": true}'),
+('Gerente de Ventas', 'Supervisa equipos de ventas', '{"view_all_deals": true, "manage_team": true, "view_reports": true}'),
+('Comercial', 'Gestiona clientes y ventas', '{"manage_own_deals": true, "view_own_reports": true}');
+
+INSERT INTO deal_phases (name, order_index, probability) VALUES
+('Prospecto', 1, 10),
+('Primer Contacto', 2, 25),
+('Propuesta Comercial', 3, 50),
+('Negociación', 4, 75),
+('Cerrada-Ganada', 5, 100),
+('Cerrada-Perdida', 6, 0);
+
+---
+---
+
+-- ====================================
+-- INSERCIÓN DE DATOS PARA CRITERIOS CRM
+-- ====================================
+-- 1. INSERTAR CATEGORÍAS DE ACTIVIDADES
+INSERT INTO activity_categories (name) VALUES 
+('ACTIVIDADES COMERCIALES'),
+('ACTIVIDADES OPERATIVAS'),
+('ACTIVIDADES ADMINISTRATIVAS');
+
+-- 2. INSERTAR TAREAS
+-- Tareas para ACTIVIDADES COMERCIALES (category_id = 1)
+INSERT INTO tasks (category_id, name) VALUES 
+(1, 'Búsqueda de prospectos'),
+(1, 'Innovación - Proyecto HLN'),
+(1, 'Contacto'),
+(1, 'Propuesta Comercial'),
+(1, 'Cotización'),
+(1, 'Activación'),
+(1, 'Remite otros productos');
+
+-- Tareas para ACTIVIDADES OPERATIVAS (category_id = 2)
+INSERT INTO tasks (category_id, name) VALUES 
+(2, 'Servicio al Cliente');
+
+-- Tareas para ACTIVIDADES ADMINISTRATIVAS (category_id = 3)
+INSERT INTO tasks (category_id, name) VALUES 
+(3, 'Facturación'),
+(3, 'Informes administrativos'),
+(3, 'Reuniones Internas');
+
+-- 3. INSERTAR SUB-TAREAS
+-- Sub-tareas para "Búsqueda de prospectos" (task_id = 1)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(1, 'Búsqueda por LinkedIn', 'Búsqueda de contactos/prospectos en la plataforma LinkedIn'),
+(1, 'Búsqueda en periódicos', 'Búsqueda de prospectos en diferentes medios de comunicación (periódicos, redes sociales, radio, internet, etc)'),
+(1, 'Búsqueda en redes sociales', 'Búsqueda de prospectos en diferentes medios de comunicación'),
+(1, 'Búsqueda en internet', 'Búsqueda de prospectos en diferentes medios de comunicación'),
+(1, 'Referidos', 'Búsqueda de prospectos por referidos'),
+(1, 'Otra (temporal)', 'Otras formas de búsqueda de prospectos');
+
+-- Sub-tareas para "Innovación - Proyecto HLN" (task_id = 2)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(2, 'Búsqueda por LinkedIn', 'Búsqueda de contactos/prospectos en la plataforma LinkedIn'),
+(2, 'Búsqueda en periódicos', 'Búsqueda de prospectos en diferentes medios de comunicación'),
+(2, 'Búsqueda en redes sociales', 'Búsqueda de prospectos en diferentes medios de comunicación'),
+(2, 'Búsqueda en internet', 'Búsqueda de prospectos en diferentes medios de comunicación'),
+(2, 'Referidos', 'Búsqueda de prospectos por referidos'),
+(2, 'Otra (temporal)', 'Otras formas de búsqueda de prospectos');
+
+-- Sub-tareas para "Contacto" (task_id = 3)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(3, 'Primer Contacto', 'Primera conversación que se tiene con prospecto (Llamada, correo, WhatsApp)'),
+(3, 'Seguimiento al contacto', 'Seguimiento posterior al primer contacto (Llamada, correo, WhatsApp)'),
+(3, 'Programación de reunión', 'Agendamiento de reunión ya sea virtual o presencial para presentar la propuesta');
+
+-- Sub-tareas para "Propuesta Comercial" (task_id = 4)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(4, 'Envío de piezas promocionales HLN', 'Envío de piezas enviadas previamente por community manager en donde se ve reflejado lo que es HLN'),
+(4, 'Visitas presenciales a prospectos', 'Asistir de manera presencial a las instalaciones del prospecto con el fin de presentar una propuesta'),
+(4, 'Reunión virtual', 'Encuentro sincrónico por medio de plataformas como: teams, meet, skype, etc'),
+(4, 'Seguimiento a la propuesta presentada', 'Envío de correo electrónico con información de interés'),
+(4, 'Respuesta a la propuesta (Cierre de propuesta)', 'Cierre de la respuesta (Ganada o perdida)'),
+(4, 'Licitación', 'Cuando se presente');
+
+-- Sub-tareas para "Cotización" (task_id = 5)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(5, 'Generación de cotización', 'Elaboración de documento'),
+(5, 'Actualización de cotización', 'Modificaciones respecto a las solicitudes del cliente o de manera interna');
+
+-- Sub-tareas para "Activación" (task_id = 6)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(6, 'Recolección de documentación', 'Hace referencia al diligenciamiento y envío'),
+(6, 'Diligenciamiento y gestión del GCM-FM-008 / GCM-FM-014', 'Diligenciamiento del GCM-FM-08 / Diligenciamiento del FT-GCM-014'),
+(6, 'Configuración de plataforma Hallon', 'Creación de alertas, categorías, solicitud de creación de querys'),
+(6, 'Configuración de plataforma HLN', 'Se envía activación vía correo electrónico a proceso de Monitoreo y Operación'),
+(6, 'Formalización de activación en dpto. administrativo', 'Formalización de activación en departamento administrativo');
+
+-- Sub-tareas para "Remite otros productos" (task_id = 7)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(7, 'Remite otros productos', 'Cliente no manifiesta interés en HLN pero si en otro producto de la compañía. Hace referencia cuando el cliente manifieste interés en otro producto de la compañía diferente al ofertado');
+
+-- Sub-tareas para "Servicio al Cliente" (task_id = 8)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(8, 'Renovación', 'Notificación previa/posterior a la fecha de terminación del contrato para la ampliación de los servicios estipulados'),
+(8, 'Extensión', 'Notificación previa a la fecha de terminación del contrato para la ampliación de los servicios estipulados'),
+(8, 'Actualización del servicio', 'Solicitudes de actualización de los requisitos pactados en primera instancia con el cliente'),
+(8, 'Desactivación', 'Contacto vía telefónica o WhatsApp con el cliente / Notificación a los procesos de interés acerca de la novedad'),
+(8, 'Capacitación', 'Reunión virtual en donde se da explicación al cliente acerca de cómo manejar la plataforma'),
+(8, 'PRS', 'Atención a requerimientos adicionales al servicio'),
+(8, 'Petición', 'Envío de correo electrónico informando la renovación del cliente junto con sus respectivos formatos'),
+(8, 'Queja', 'Manifestación por parte del cliente en donde se expresa su insatisfacción con la atención recibida por parte de Siglo Data'),
+(8, 'Reuniones Comerciales', 'Reunión virtual'),
+(8, 'Trafico', 'Visita presencial cliente'),
+(8, 'Capacitaciones', 'Capacitación al cliente'),
+(8, 'Otra (temporal)', 'Otras actividades operativas temporales');
+
+-- Sub-tareas para "Facturación" (task_id = 9)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(9, 'Cobro de cartera a clientes', 'Comunicación con el cliente consultando acerca del pago'),
+(9, 'Novedades en facturación', 'Notificaciones a contabilidad acerca de novedades en el servicio que afecten la facturación'),
+(9, 'Otra (temporal)', 'Otras actividades de facturación temporales');
+
+-- Sub-tareas para "Informes administrativos" (task_id = 10)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(10, 'Informe de actividades', 'Solicitud por parte de administrativo acerca de actividades ejecutadas por los ejecutivos comerciales'),
+(10, 'Otra (temporal)', 'Otras actividades de informes temporales');
+
+-- Sub-tareas para "Reuniones Internas" (task_id = 11)
+INSERT INTO sub_tasks (task_id, name, description) VALUES 
+(11, 'Reunión semanal con el equipo comercial', 'Reunión semanal con el equipo comercial'),
+(11, 'Reunión quincenal con lideres de proceso', 'Reunión quincenal con líderes de proceso'),
+(11, 'Asistencia a capacitaciones programadas por parte de Siglo Data', 'Asistencia a capacitaciones programadas por parte de Siglo Data');
+
+---
+---
+
+-- ====================================
+-- VERIFICACIÓN DE DATOS INSERTADOS
+-- ====================================
+
+-- Consultar categorías insertadas
+SELECT * FROM activity_categories ORDER BY id;
+
+-- Consultar tareas insertadas con sus categorías
+SELECT 
+    t.id as task_id,
+    ac.name as category_name,
+    t.name as task_name
+FROM tasks t
+JOIN activity_categories ac ON t.category_id = ac.id
+ORDER BY ac.id, t.id;
+
+-- Consultar sub-tareas insertadas con sus tareas y categorías
+SELECT 
+    st.id as subtask_id,
+    ac.name as category_name,
+    t.name as task_name,
+    st.name as subtask_name,
+    st.description
+FROM sub_tasks st
+JOIN tasks t ON st.task_id = t.id
+JOIN activity_categories ac ON t.category_id = ac.id
+ORDER BY ac.id, t.id, st.id;
+
+-- Contar registros por tabla
+SELECT 
+    'activity_categories' as tabla, 
+    COUNT(*) as total_registros 
+FROM activity_categories
+UNION ALL
+SELECT 
+    'tasks' as tabla, 
+    COUNT(*) as total_registros 
+FROM tasks
+UNION ALL
+SELECT 
+    'sub_tasks' as tabla, 
+    COUNT(*) as total_registros 
+FROM sub_tasks;

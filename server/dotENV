@@ -1,11 +1,18 @@
 cambiar el .env de C:\Users\kdaza\Proyectos\CRM_V1\server\.env
 por este
-# Database Configuration
-DB_HOST=localhost
+# Database Configuration for pgadmin
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_NAME=crm_v1
+# DB_USER=postgres
+# DB_PASSWORD=admin
+
+# Database Configuration (Supabase)
+DB_HOST=db.clgecdnfvzpsqletpekn.supabase.co
 DB_PORT=5432
-DB_NAME=crm_v1
+DB_NAME=postgres
 DB_USER=postgres
-DB_PASSWORD=admin
+DB_PASSWORD=tu-contraseña-aquí
 
 # JWT Configuration
 JWT_SECRET=aE7v9X2kN3sQ1zU8pLdC6vYwR5tGjHmF
